@@ -9,7 +9,15 @@ set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 add_executable(huffman-compressor
     src/main.cpp
 )
-
 target_include_directories(huffman-compressor PRIVATE
     "include"
 )
+
+add_library(huffman-compressor-lib STATIC
+    src/HuffmanTree.cpp
+)
+target_include_directories(huffman-compressor-lib PUBLIC
+    "include"
+)
+
+add_subdirectory("test")

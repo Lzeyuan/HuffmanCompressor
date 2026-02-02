@@ -3,6 +3,9 @@
 #include <fstream>
 #include <vector>
 
+#include "BitWriter.hpp"
+#include "HuffmanTree.hpp"
+
 namespace leza::compression::huffman {
 
 constexpr int REVERSE_SIZE = 8;
@@ -20,25 +23,27 @@ struct FileHeader {
 
 class HuffmanArchiver {
 public:
-  std::vector<uint8_t> compress(std::string_view in, std::string_view out);
+  std::vector<uint8_t> compress(std::string_view inputPath,
+                                std::string_view out);
 
 private:
   std::vector<uint8_t> serializeHeader(const FileHeader &header);
 };
 
 class FileCompressor {
-private:
-  static const size_t BUFFER_SIZE = 1024 * 1024;
-
-  std::string inputPath;
-  std::string outputPath;
-
-  uint64_t frequencies[256] = {0};
 
 public:
   FileCompressor(std::string_view in, std::string_view out)
-      : inputPath(in), outputPath(out) {}
+      : inputPath_(in), outputPath_(out) {}
 
   void compress();
+
+private:
+  static const size_t BUFFER_SIZE = 1024 * 1024;
+
+  std::string inputPath_;
+  std::string outputPath_;
+  HuffmanTree huffmanTree_;
+  HuffmanTree::FrequencyArray frequencies_;
 };
 } // namespace leza::compression::huffman
