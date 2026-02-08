@@ -5,19 +5,23 @@
 
 #include "HuffmanTree.hpp"
 
-TEST(Huffman, SingleSymbol) {
+TEST(Huffman, PrintTree) {
   using leza::compression::huffman::HuffmanTree;
-  std::vector<uint8_t> input = {'A', 'A', 'A', 'A', 'B', 'C', 'C', 'F'};
+  constexpr int BYTE_SIZE = 256;
+  std::vector<uint8_t> input{'A', 'A', 'A', 'A', 'B', 'C', 'C', 'F'};
 
-  HuffmanTree tree;
-  std::array<uint64_t, 256> frequencies;
+  std::array<uint64_t, 256> frequencies{};
 
   for (auto byte : input) {
     frequencies[byte]++;
   }
 
-  tree.buildTree(frequencies);
-  tree.printTree();
-  tree.printTable();
-  std::println("{}", tree.encode(input));
+  auto [codeTable, root] = HuffmanTree::build(frequencies);
+
+  HuffmanTree::printTree(root.get());
+  for (int i = 0; i < BYTE_SIZE; i++) {
+    if (!codeTable[i].empty()) {
+      std::println("{:c}, {}", i, codeTable[i]);
+    }
+  }
 }

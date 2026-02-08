@@ -3,16 +3,16 @@
 
 namespace leza::compression::huffman {
 void BitWriter::writeBit(bool bit) {
-  buffer <<= 1;
+  buffer_ <<= 1;
   if (bit) {
-    buffer |= 1;
+    buffer_ |= 1;
   }
-  ++bitCount;
+  ++bitCount_;
 
-  if (bitCount == 8) {
-    out.put(static_cast<char>(buffer));
-    buffer = 0;
-    bitCount = 0;
+  if (bitCount_ == 8) {
+    out.put(static_cast<char>(buffer_));
+    buffer_ = 0;
+    bitCount_ = 0;
   }
 }
 
@@ -30,13 +30,16 @@ void BitWriter::writeBits(std::string_view bits) {
   }
 }
 
-void BitWriter::flush() {
-  if (bitCount > 0) {
-    buffer <<= (8 - bitCount); // 低位补 0
-    out.put(static_cast<char>(buffer));
-    buffer = 0;
-    bitCount = 0;
+int BitWriter::flush() {
+  if (bitCount_ > 0) {
+    int fillCount = (8 - bitCount_);
+    buffer_ <<= fillCount;
+    out.put(static_cast<char>(buffer_));
+    buffer_ = 0;
+    bitCount_ = 0;
+    return fillCount;
   }
+  return 0;
 }
 
 } // namespace leza::compression::huffman

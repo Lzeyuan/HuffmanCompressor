@@ -15,6 +15,8 @@ target_include_directories(huffman-compressor PRIVATE
 
 add_library(huffman-compressor-lib STATIC
     src/HuffmanTree.cpp
+    # src/HuffmanCompressor.cpp
+    # src/BitWriter.cpp
 )
 target_include_directories(huffman-compressor-lib PUBLIC
     "include"

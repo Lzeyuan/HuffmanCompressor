@@ -12,13 +12,13 @@ public:
   void writeBit(bool bit);
   void writeBits(uint64_t bits, uint8_t count);
   void writeBits(std::string_view bits);
-  void flush();
+  int flush();
 
 private:
   std::ostream &out;
 
-  uint8_t buffer = 0;   // bit 缓冲
-  uint8_t bitCount = 0; // 当前 buffer 中已有多少 bit（0~7）
+  uint8_t buffer_ = 0;   // bit 缓冲
+  uint8_t bitCount_ = 0; // 当前 buffer 中已有多少 bit（0~7）
 };
 
 } // namespace leza::compression::huffman

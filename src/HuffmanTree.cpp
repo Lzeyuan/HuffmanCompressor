@@ -1,21 +1,29 @@
 #include "HuffmanTree.hpp"
 
-#include <cstddef>
 #include <memory>
 #include <print>
 #include <queue>
+#include <span>
 #include <string>
 
 namespace leza::compression::huffman {
-void HuffmanTree::buildTree(const uint8_t *bytes, size_t size) noexcept {
+HuffmanTree::Result
+HuffmanTree::build(std::span<const uint8_t> bytes) noexcept {
   FrequencyArray frequencies;
-  for (int i = 0; i < size; i++) {
-    frequencies[bytes[i]]++;
+  for (uint8_t byte : bytes) {
+    frequencies[byte]++;
   }
-  this->buildTree(frequencies);
+  return HuffmanTree::build(frequencies);
 }
 
-void HuffmanTree::buildTree(const FrequencyArray &freq) noexcept {
+HuffmanTree::Result HuffmanTree::build(const FrequencyArray &freq) noexcept {
+  HuffmanNodePtr root = buildTree(freq);
+  CodeTable tables = generateCodeTable(root.get());
+  return {tables, std::move(root)};
+}
+
+HuffmanTree::HuffmanNodePtr
+HuffmanTree::buildTree(const FrequencyArray &freq) noexcept {
   using std::priority_queue;
   using std::unique_ptr;
   using std::vector;
@@ -48,71 +56,75 @@ void HuffmanTree::buildTree(const FrequencyArray &freq) noexcept {
     pq.push(new HuffmanNode(std::move(nodeA), std::move(nodeB)));
   }
 
-  root_ = HuffmanNodePtr(pq.top());
-  pq.pop();
-
-  // 生成编码
-  tables_.fill("");
-  generateCodes(root_.get(), "");
+  auto root = HuffmanNodePtr(pq.top());
+  return root;
 }
 
-void HuffmanTree::generateCodes(HuffmanNode *node,
-                                const std::string &code) noexcept {
-  if (!node)
-    return;
+HuffmanTree::CodeTable
+HuffmanTree::generateCodeTable(HuffmanNode *root) noexcept {
+  CodeTable ret;
+  auto generate = [&ret](this auto &&generate, HuffmanNode *node,
+                         const std::string &code) -> void {
+    if (!node)
+      return;
 
-  if (node->isLeaf()) {
-    tables_[node->symbol] = code;
-    return;
-  }
-
-  if (node->left) {
-    generateCodes(node->left.get(), code + "0");
-  }
-  if (node->right) {
-    generateCodes(node->right.get(), code + "1");
-  }
-}
-
-std::string HuffmanTree::encode(const std::vector<uint8_t> &bits) noexcept {
-  std::string result;
-  for (uint8_t bit : bits) {
-    result.append(tables_[bit]);
-  }
-  return result;
-}
-
-std::string HuffmanTree::encode(const char *bits, size_t size) noexcept {
-  std::string result;
-  for (int i = 0; i < size; i++) {
-    result.append(tables_[bits[i]]);
-  }
-  return result;
-}
-
-std::vector<uint8_t> HuffmanTree::decode(std::string_view data) noexcept {
-  std::vector<uint8_t> result;
-  auto *current = root_.get();
-
-  for (uint8_t bit : data) {
-    if (bit == 0) {
-      current = current->left.get();
-    } else {
-      current = current->right.get();
+    if (node->isLeaf()) {
+      ret[node->symbol] = code;
+      return;
     }
 
-    if (current->isLeaf()) {
-      result.emplace_back(current->symbol);
-      current = root_.get();
+    if (node->left) {
+      generate(node->left.get(), code + "0");
     }
-  }
-
-  return result;
+    if (node->right) {
+      generate(node->right.get(), code + "1");
+    }
+  };
+  generate(root, "");
+  return ret;
 }
 
-void HuffmanTree::printTree() { printNode(root_.get(), "", false); }
+// std::string HuffmanTree::encode(const std::vector<uint8_t> &bytes) noexcept {
+//   std::string result;
+//   for (uint8_t byte : bytes) {
+//     result.append(tables_[byte]);
+//   }
+//   return result;
+// }
 
-void HuffmanTree::printNode(const HuffmanTree::HuffmanNode *node,
+// std::string HuffmanTree::encode(const char *bytes, size_t size) noexcept {
+//   std::string result;
+//   for (int i = 0; i < size; i++) {
+//     result.append(tables_[static_cast<uint8_t>(bytes[i])]);
+//   }
+//   return result;
+// }
+
+// std::vector<uint8_t> HuffmanTree::decode(std::string_view data) noexcept {
+//   std::vector<uint8_t> result;
+//   auto *current = root_.get();
+
+//   for (uint8_t bit : data) {
+//     if (bit == 0) {
+//       current = current->left.get();
+//     } else {
+//       current = current->right.get();
+//     }
+
+//     if (current->isLeaf()) {
+//       result.emplace_back(current->symbol);
+//       current = root_.get();
+//     }
+//   }
+
+//   return result;
+// }
+
+void HuffmanTree::printTree(const HuffmanNode *const node) {
+  printNode(node, "", false);
+}
+
+void HuffmanTree::printNode(const HuffmanNode *const node,
                             const std::string &prefix, bool is_left) noexcept {
   if (!node) {
     return;
@@ -122,7 +134,6 @@ void HuffmanTree::printNode(const HuffmanTree::HuffmanNode *node,
 
   if (node->isLeaf()) {
     std::println("({}, {})", static_cast<char>(node->symbol), node->freq);
-
   } else {
     std::println("(*, {})", node->freq);
   }
@@ -133,14 +144,6 @@ void HuffmanTree::printNode(const HuffmanTree::HuffmanNode *node,
     printNode(node->left.get(), child_prefix, true);
   if (node->right)
     printNode(node->right.get(), child_prefix, false);
-}
-
-void HuffmanTree::printTable() {
-  for (int i = 0; i < BYTE_SIZE; i++) {
-    if (!tables_[i].empty()) {
-      std::println("{:c}, {}", i, tables_[i]);
-    }
-  }
 }
 
 } // namespace leza::compression::huffman

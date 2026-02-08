@@ -14,11 +14,11 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 
 add_executable(
-  hello_test
-  hello_test.cpp
+  HelloTest
+  HelloTest.cpp
 )
 target_link_libraries(
-  hello_test
+  HelloTest
   GTest::gtest_main
 )
 
@@ -32,6 +32,17 @@ target_link_libraries(
   huffman-compressor-lib
 )
 
+add_executable(
+  HuffmanCompressorTest
+  HuffmanCompressorTest.cpp
+)
+target_link_libraries(
+  HuffmanCompressorTest
+  GTest::gtest_main
+  huffman-compressor-lib
+)
+
 include(GoogleTest)
-gtest_discover_tests(hello_test)
+gtest_discover_tests(HelloTest)
+gtest_discover_tests(HuffmanCompressorTest)
 
