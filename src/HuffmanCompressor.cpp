@@ -53,48 +53,81 @@ bool Decoder::decode(bool bit, std::byte &outByte) {
 // }
 
 HuffmanTree::FrequencyArray
-FileCompressor::getFrequencyArray(std::ifstream &inputStream) {
+FileCompressor::getFrequencyArray(std::istream &inputStream,
+                                  uint64_t &fileSize) {
   HuffmanTree::FrequencyArray frequencies;
   char buffer_[BUFFER_SIZE];
-
+  fileSize = 0;
   while (inputStream.read(buffer_, BUFFER_SIZE) || inputStream.gcount() > 0) {
     size_t readCount = inputStream.gcount();
+    fileSize += readCount;
     for (size_t i = 0; i < readCount; i++) {
       frequencies[i]++;
     }
   }
+
   return frequencies;
 }
 
 int FileCompressor::compress(const std::string &inputPath,
                              const std::string &outputPath) {
-  std::ifstream inputFileStream(inputPath_, std::ios::binary);
-  std::ofstream outputFile(outputPath_, std::ios::binary);
+  // 打开文件
+  std::ifstream inputFileStream(inputPath, std::ios::binary);
+  std::ofstream outputFileStream(outputPath, std::ios::binary);
 
   if (!inputFileStream) {
-    throw std::runtime_error("无法打开文件: " + inputPath_);
+    throw std::runtime_error("无法打开文件: " + inputPath);
   }
-  if (!outputFile) {
-    throw std::runtime_error("无法写入文件: " + outputPath_);
+  if (!outputFileStream) {
+    throw std::runtime_error("无法写入文件: " + outputPath);
   }
+  return compress(inputFileStream, outputFileStream);
+}
 
-  auto frequencies = getFrequencyArray(inputFileStream);
-  auto [codeTable, root] = HuffmanTree::build(frequencies);
+int FileCompressor::compress(std::istream &inputStream,
+                             std::ostream &outputStream) {
+  // 1.文件头
+  Header header;
+  header.magicNumber = MAGIC_NUMBER;
+  header.version = VERSION_NUMBER;
+  header.isDirectory = false;
+  header.extend = 0;
+
+  // TODO: 序列化树，
+
+  // 2.哈夫曼树序列化数据
+  
+
+  // 1.建表
+  auto frequencies = getFrequencyArray(inputStream, header.originFileSize);
+  auto root = HuffmanTree::buildTree(frequencies);
+  auto codeTable = HuffmanTree::buildCodeTable(root.get());
   Encoder encoder(codeTable);
 
-  inputFileStream.seekg(0);
-  BitWriter bitWriter(outputFile);
-
-  while (inputFileStream.read(buffer_, BUFFER_SIZE) || inputFileStream.gcount() > 0) {
-    size_t readCount = inputFileStream.gcount();
+  // 2.编码&写入
+  inputStream.seekg(0);
+  uint8_t bitCount = 0;
+  uint64_t compressByteCount = 0;
+  BitWriter bitWriter(outputStream);
+  while (inputStream.read(buffer_, BUFFER_SIZE) || inputStream.gcount() > 0) {
+    size_t readCount = inputStream.gcount();
     std::string encodeBits;
     for (size_t i = 0; i < readCount; i++) {
       encodeBits += encoder.encode(static_cast<std::byte>(buffer_[i]));
     }
     for (auto bit : encodeBits) {
       bitWriter.writeBit(bit == '0');
+      bitCount++;
+      if (bitCount == 8) {
+        compressByteCount++;
+      }
     }
   }
+  if (bitCount > 8) {
+    compressByteCount++;
+  }
+
+  header.compressSize = compressByteCount;
   return bitWriter.flush();
 }
 

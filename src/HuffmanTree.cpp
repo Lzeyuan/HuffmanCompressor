@@ -3,25 +3,9 @@
 #include <memory>
 #include <print>
 #include <queue>
-#include <span>
 #include <string>
 
 namespace leza::compression::huffman {
-HuffmanTree::Result
-HuffmanTree::build(std::span<const uint8_t> bytes) noexcept {
-  FrequencyArray frequencies;
-  for (uint8_t byte : bytes) {
-    frequencies[byte]++;
-  }
-  return HuffmanTree::build(frequencies);
-}
-
-HuffmanTree::Result HuffmanTree::build(const FrequencyArray &freq) noexcept {
-  HuffmanNodePtr root = buildTree(freq);
-  CodeTable tables = generateCodeTable(root.get());
-  return {tables, std::move(root)};
-}
-
 HuffmanTree::HuffmanNodePtr
 HuffmanTree::buildTree(const FrequencyArray &freq) noexcept {
   using std::priority_queue;
@@ -58,6 +42,15 @@ HuffmanTree::buildTree(const FrequencyArray &freq) noexcept {
 
   auto root = HuffmanNodePtr(pq.top());
   return root;
+}
+
+HuffmanTree::CodeTable HuffmanTree::buildCodeTable(HuffmanNode *root) noexcept {
+  return generateCodeTable(root);
+}
+
+HuffmanTree::CodeTable
+HuffmanTree::buildCodeTable(const FrequencyArray &freq) noexcept {
+  return generateCodeTable(buildTree(freq).get());
 }
 
 HuffmanTree::CodeTable

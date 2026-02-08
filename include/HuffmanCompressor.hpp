@@ -1,6 +1,6 @@
 #include <cstdint>
+#include <istream>
 #include <string>
-#include <vector>
 
 #include "HuffmanTree.hpp"
 
@@ -56,15 +56,26 @@ class FileCompressor {
 public:
   using HuffmanNodePtr = HuffmanTree::HuffmanNodePtr;
   using CodeTable = HuffmanTree::CodeTable;
+
+  const uint32_t MAGIC_NUMBER = 0x113;
+  const uint8_t VERSION_NUMBER = 0x1;
+
   FileCompressor() = default;
   ~FileCompressor() = default;
+  FileCompressor(const FileCompressor &) = delete;
+  FileCompressor &operator=(const FileCompressor &) = delete;
 
   // static std::unique_ptr<FileCompressor> create(const std::string &inputPath,
   //                                               const std::string
   //                                               &outputPath);
 
-  int compress(const std::string &inputPath, const std::string &outputPath);
-  void decompress(const std::string &out);
+  // 返回补0数
+  [[nodiscard]] int compress(const std::string &inputPath,
+                             const std::string &outputPath);
+  [[nodiscard]] int compress(std::istream &inputStream,
+                             std::ostream &outputStream);
+
+  // void decompress(const std::string &out);
 
 private:
   static constexpr size_t BUFFER_SIZE = 1024 * 1024;
@@ -73,15 +84,7 @@ private:
   std::string outputPath_;
   char buffer_[BUFFER_SIZE];
 
-  // Encoder encoder_;
-  // Decoder decoder_;
-
-  FileCompressor(const FileCompressor &) = delete;
-  FileCompressor &operator=(const FileCompressor &) = delete;
-
-  // static HuffmanTree::FrequencyArray
-  // getFrequencyArray(const std::string &inputPath);
   [[nodiscard]] static HuffmanTree::FrequencyArray
-  getFrequencyArray(std::ifstream &inputStream);
+  getFrequencyArray(std::istream &inputStream, uint64_t &fileSize);
 };
 } // namespace leza::compression::huffman::simple

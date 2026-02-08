@@ -33,10 +33,6 @@ public:
   static constexpr size_t BYTE_SIZE = 256;
   using HuffmanNodePtr = std::unique_ptr<HuffmanNode>;
   using CodeTable = std::array<std::string, BYTE_SIZE>;
-  struct Result {
-    CodeTable codeTable;
-    HuffmanNodePtr root;
-  };
   using FrequencyArray = std::array<uint64_t, BYTE_SIZE>;
 
   HuffmanTree() = delete;
@@ -46,13 +42,13 @@ public:
   HuffmanTree(HuffmanTree &&) noexcept = delete;
   HuffmanTree &operator=(HuffmanTree &&) noexcept = delete;
 
-  [[nodiscard]] static Result build(const FrequencyArray &freq) noexcept;
-  [[nodiscard]] static Result build(std::span<const uint8_t> bytes) noexcept;
+  [[nodiscard]] static HuffmanNodePtr buildTree(const FrequencyArray &freq) noexcept;
+  [[nodiscard]] static CodeTable buildCodeTable(HuffmanNode *root) noexcept;
+  [[nodiscard]] static CodeTable buildCodeTable(const FrequencyArray &freq) noexcept;
 
   static void printTree(const HuffmanNode *const node);
 
 private:
-  static HuffmanNodePtr buildTree(const FrequencyArray &freq) noexcept;
   static CodeTable generateCodeTable(HuffmanNode *root) noexcept;
   static void printNode(const HuffmanNode *const node,
                         const std::string &prefix, bool is_left) noexcept;
