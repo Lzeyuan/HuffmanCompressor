@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <span>
 #include <string>
 
 namespace leza::compression::huffman {
@@ -16,16 +15,14 @@ public:
     using HuffmanNodePtr = std::unique_ptr<HuffmanNode>;
 
     uint8_t symbol;
-    uint64_t freq;
     HuffmanNodePtr left;
     HuffmanNodePtr right;
 
-    HuffmanNode(uint8_t c, uint64_t f) noexcept
-        : symbol(c), freq(f), left(nullptr), right(nullptr) {}
+    HuffmanNode(uint8_t c) noexcept
+        : symbol(c), left(nullptr), right(nullptr) {}
 
     HuffmanNode(HuffmanNodePtr &&l, HuffmanNodePtr &&r) noexcept
-        : symbol(0), freq(l->freq + r->freq), left(std::move(l)),
-          right(std::move(r)) {}
+        : symbol(0), left(std::move(l)), right(std::move(r)) {}
 
     bool isLeaf() const noexcept { return !left && !right; }
   };
@@ -42,9 +39,11 @@ public:
   HuffmanTree(HuffmanTree &&) noexcept = delete;
   HuffmanTree &operator=(HuffmanTree &&) noexcept = delete;
 
-  [[nodiscard]] static HuffmanNodePtr buildTree(const FrequencyArray &freq) noexcept;
+  [[nodiscard]] static HuffmanNodePtr
+  buildTree(const FrequencyArray &freq) noexcept;
   [[nodiscard]] static CodeTable buildCodeTable(HuffmanNode *root) noexcept;
-  [[nodiscard]] static CodeTable buildCodeTable(const FrequencyArray &freq) noexcept;
+  [[nodiscard]] static CodeTable
+  buildCodeTable(const FrequencyArray &freq) noexcept;
 
   static void printTree(const HuffmanNode *const node);
 

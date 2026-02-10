@@ -1,47 +1,57 @@
 #include "HuffmanTree.hpp"
 
+#include <cstdint>
 #include <memory>
 #include <print>
 #include <queue>
 #include <string>
+#include <utility>
 
 namespace leza::compression::huffman {
 HuffmanTree::HuffmanNodePtr
 HuffmanTree::buildTree(const FrequencyArray &freq) noexcept {
-  using std::priority_queue;
-  using std::unique_ptr;
-  using std::vector;
   using HuffmanNodePtr = std::unique_ptr<HuffmanNode>;
+  using FrequencyNode = std::pair<uint64_t, HuffmanNodePtr>;
 
-  auto huffmanNodeCmp = [](const HuffmanNode *a, const HuffmanNode *b) -> bool {
-    return a->freq > b->freq;
+  auto huffmanNodeCmp = [](const FrequencyNode &a,
+                           const FrequencyNode &b) -> bool {
+    return a.first > b.first;
   };
 
-  priority_queue<HuffmanNode *, vector<HuffmanNode *>, decltype(huffmanNodeCmp)>
+  std::priority_queue<FrequencyNode, std::vector<FrequencyNode>,
+                      decltype(huffmanNodeCmp)>
       pq;
 
   for (int i = 0; i < 256; ++i) {
     if (freq[i] > 0) {
-      pq.push(new HuffmanNode(i, freq[i]));
+      pq.push({freq[i], std::make_unique<HuffmanNode>(i)});
     }
+  }
+
+  if (pq.size() == 0) {
+    return nullptr;
   }
 
   // 单字符文件兜底
   if (pq.size() == 1) {
     uint8_t dummyChar = freq[0] > 0 ? 1 : 0;
-    pq.push(new HuffmanNode(dummyChar, 0));
+    pq.push({0, std::make_unique<HuffmanNode>(dummyChar)});
   }
 
   while (pq.size() > 1) {
-    HuffmanNodePtr nodeA(pq.top());
+    auto [freq1, left] = std::move(const_cast<FrequencyNode &>(pq.top()));
     pq.pop();
-    HuffmanNodePtr nodeB(pq.top());
+
+    auto [freq2, right] = std::move(const_cast<FrequencyNode &>(pq.top()));
     pq.pop();
-    pq.push(new HuffmanNode(std::move(nodeA), std::move(nodeB)));
+
+    auto new_node =
+        std::make_unique<HuffmanNode>(std::move(left), std::move(right));
+    pq.push({freq1 + freq2, std::move(new_node)});
   }
 
-  auto root = HuffmanNodePtr(pq.top());
-  return root;
+  auto [_, root] = std::move(const_cast<FrequencyNode &>(pq.top()));
+  return std::move(root);
 }
 
 HuffmanTree::CodeTable HuffmanTree::buildCodeTable(HuffmanNode *root) noexcept {
@@ -123,12 +133,12 @@ void HuffmanTree::printNode(const HuffmanNode *const node,
     return;
   }
 
-  std::print("{} {}", prefix, is_left ? "├── " : "└── ");
+  std::print("{}{}", prefix, is_left ? "├── " : "└── ");
 
   if (node->isLeaf()) {
-    std::println("({}, {})", static_cast<char>(node->symbol), node->freq);
+    std::println("({})", static_cast<uint8_t>(node->symbol));
   } else {
-    std::println("(*, {})", node->freq);
+    std::println("[{}]", is_left ? "0" : "1");
   }
 
   const std::string child_prefix = prefix + (is_left ? "│   " : "    ");

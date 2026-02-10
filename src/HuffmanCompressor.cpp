@@ -6,6 +6,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "BitWriter.hpp"
 #include "HuffmanTree.hpp"
@@ -96,7 +97,6 @@ int FileCompressor::compress(std::istream &inputStream,
   // TODO: 序列化树，
 
   // 2.哈夫曼树序列化数据
-  
 
   // 1.建表
   auto frequencies = getFrequencyArray(inputStream, header.originFileSize);
@@ -129,6 +129,71 @@ int FileCompressor::compress(std::istream &inputStream,
 
   header.compressSize = compressByteCount;
   return bitWriter.flush();
+}
+
+void FileCompressor::write4Byte(std::ostream &os, uint32_t v) {
+  Byte b[4] = {Byte((v >> 24) & 0xFF), Byte((v >> 16) & 0xFF),
+               Byte((v >> 8) & 0xFF), Byte(v & 0xFF)};
+  os.write(reinterpret_cast<char *>(b), 4);
+}
+
+void FileCompressor::buildSerializationArrays(const HuffmanNode *node,
+                                              std::vector<bool> &structBits,
+                                              std::vector<Byte> &leaves) {
+  if (!node) {
+    return;
+  }
+
+  if (node->isLeaf()) {
+    structBits.push_back(true);     // 1 = leaf
+    leaves.push_back(node->symbol); // 叶子数据按先序收集
+  } else {
+    structBits.push_back(false); // 0 = internal
+    buildSerializationArrays(node->left.get(), structBits, leaves);
+    buildSerializationArrays(node->right.get(), structBits, leaves);
+  }
+}
+
+void FileCompressor::bits2BytesWithMSBF(const std::vector<bool> &bits,
+                                  std::vector<Byte> &out) {
+  size_t bitCount = bits.size();
+  size_t byteCount = (bitCount) / 8;
+  out.assign(byteCount, 0);
+  for (size_t i = 0; i < byteCount; ++i) {
+    int bitIndex = i << 3;
+    for (size_t j = 0; j < 8; j++) {
+      if (bits[bitIndex + j]) {
+        out[i] |= 1u << j;
+      }
+    }
+  }
+}
+
+void FileCompressor::serializeTree2Stream(const HuffmanTree::HuffmanNode *root,
+                                          std::ostream &os) {
+  std::vector<bool> structBits;
+  std::vector<Byte> leaves;
+  buildSerializationArrays(root, structBits, leaves);
+
+  // 1.写入树结构序列化长度
+  uint32_t structBitsLen = uint32_t(structBits.size());
+  write4Byte(os, structBitsLen);
+
+  // 2.写入子节点列表序列化长度
+  uint32_t leafCount = uint32_t(leaves.size());
+  write4Byte(os, leafCount);
+
+  // 3. 写入树结构
+  std::vector<Byte> packed;
+  bits2BytesWithMSBF(structBits, packed);
+  if (!packed.empty()) {
+    os.write(reinterpret_cast<char *>(packed.data()), packed.size());
+  }
+
+  // 4. 写入节点列表
+  if (!leaves.empty()) {
+    os.write(reinterpret_cast<char *>(leaves.data()), leaves.size());
+  }
 }
 
 } // namespace leza::compression::huffman::simple
