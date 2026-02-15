@@ -5,36 +5,37 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <queue>
 #include <string>
 #include <vector>
 
 #include "BitWriter.hpp"
 #include "HuffmanTree.hpp"
 
-namespace leza::compression::huffman::simple {
-std::string Encoder::encode(const std::byte byte) {
-  return codeTable_[std::to_integer<uint8_t>(byte)];
-}
+namespace leza::compression::huffman::classic {
+// std::string Encoder::encode(const std::byte byte) {
+//   return codeTable_[std::to_integer<uint8_t>(byte)];
+// }
 
-Decoder::Decoder(Decoder::HuffmanNodePtr &&huffmanNodePtr)
-    : root_(std::move(huffmanNodePtr)) {
-  current_ = root_.get();
-}
+// Decoder::Decoder(Decoder::HuffmanNodePtr &&huffmanNodePtr)
+//     : root_(std::move(huffmanNodePtr)) {
+//   current_ = root_.get();
+// }
 
-bool Decoder::decode(bool bit, std::byte &outByte) {
-  if (bit) {
-    current_ = current_->right.get();
-  } else {
-    current_ = current_->left.get();
-  }
+// bool Decoder::decode(bool bit, std::byte &outByte) {
+//   if (bit) {
+//     current_ = current_->right.get();
+//   } else {
+//     current_ = current_->left.get();
+//   }
 
-  if (current_->isLeaf()) {
-    outByte = static_cast<std::byte>(current_->symbol);
-    current_ = root_.get();
-    return true;
-  }
-  return false;
-}
+//   if (current_->isLeaf()) {
+//     outByte = static_cast<std::byte>(current_->symbol);
+//     current_ = root_.get();
+//     return true;
+//   }
+//   return false;
+// }
 
 // FileCompressor::FileCompressor(const std::string &inputPath,
 //                                const std::string &outputPath,
@@ -53,10 +54,9 @@ bool Decoder::decode(bool bit, std::byte &outByte) {
 //   return std::unique_ptr<FileCompressor>{t};
 // }
 
-HuffmanTree::FrequencyArray
-FileCompressor::getFrequencyArray(std::istream &inputStream,
-                                  uint64_t &fileSize) {
-  HuffmanTree::FrequencyArray frequencies;
+auto FileCompressor::getFrequencyArray(std::istream &inputStream,
+                                       uint64_t &fileSize) -> FrequencyArray {
+  FrequencyArray frequencies;
   char buffer_[BUFFER_SIZE];
   fileSize = 0;
   while (inputStream.read(buffer_, BUFFER_SIZE) || inputStream.gcount() > 0) {
@@ -94,41 +94,12 @@ int FileCompressor::compress(std::istream &inputStream,
   header.isDirectory = false;
   header.extend = 0;
 
-  // TODO: 序列化树，
-
-  // 2.哈夫曼树序列化数据
-
-  // 1.建表
+  // 2.哈夫曼树压缩&写入
   auto frequencies = getFrequencyArray(inputStream, header.originFileSize);
-  auto root = HuffmanTree::buildTree(frequencies);
-  auto codeTable = HuffmanTree::buildCodeTable(root.get());
-  Encoder encoder(codeTable);
-
-  // 2.编码&写入
-  inputStream.seekg(0);
-  uint8_t bitCount = 0;
-  uint64_t compressByteCount = 0;
-  BitWriter bitWriter(outputStream);
-  while (inputStream.read(buffer_, BUFFER_SIZE) || inputStream.gcount() > 0) {
-    size_t readCount = inputStream.gcount();
-    std::string encodeBits;
-    for (size_t i = 0; i < readCount; i++) {
-      encodeBits += encoder.encode(static_cast<std::byte>(buffer_[i]));
-    }
-    for (auto bit : encodeBits) {
-      bitWriter.writeBit(bit == '0');
-      bitCount++;
-      if (bitCount == 8) {
-        compressByteCount++;
-      }
-    }
-  }
-  if (bitCount > 8) {
-    compressByteCount++;
-  }
-
+  int compressByteCount =
+      ClassicHuffmanTreeEncoder::encode(inputStream, outputStream, frequencies);
   header.compressSize = compressByteCount;
-  return bitWriter.flush();
+  return 0;
 }
 
 void FileCompressor::write4Byte(std::ostream &os, uint32_t v) {
@@ -155,7 +126,7 @@ void FileCompressor::buildSerializationArrays(const HuffmanNode *node,
 }
 
 void FileCompressor::bits2BytesWithMSBF(const std::vector<bool> &bits,
-                                  std::vector<Byte> &out) {
+                                        std::vector<Byte> &out) {
   size_t bitCount = bits.size();
   size_t byteCount = (bitCount) / 8;
   out.assign(byteCount, 0);
@@ -169,7 +140,7 @@ void FileCompressor::bits2BytesWithMSBF(const std::vector<bool> &bits,
   }
 }
 
-void FileCompressor::serializeTree2Stream(const HuffmanTree::HuffmanNode *root,
+void FileCompressor::serializeTree2Stream(const HuffmanNode *root,
                                           std::ostream &os) {
   std::vector<bool> structBits;
   std::vector<Byte> leaves;
@@ -196,84 +167,149 @@ void FileCompressor::serializeTree2Stream(const HuffmanTree::HuffmanNode *root,
   }
 }
 
-} // namespace leza::compression::huffman::simple
+int ClassicHuffmanTreeEncoder::encode(std::istream &inputStream,
+                                      std::ostream &outputStream,
+                                      const FrequencyArray &frequencyArray) {
+  auto root = buildTree(frequencyArray);
+  auto huffmanCollector = collectTreeByPreorder(root.get());
 
-// #include <cstdint>
-// #include <fstream>
-// #include <string>
+  uint64_t compressByteCount = 0;
+  compressByteCount += serialize(outputStream, root.get());
 
-// #include "BitWriter.hpp"
+  uint8_t bitCount = 0;
+  BitWriter bitWriter(outputStream);
+  char buffer[BUFFER_SIZE];
 
-// namespace leza::compression::huffman {
-// void FileCompressor::compress() {
-//   // 打开输入文件和输出文件
-//   std::ifstream inputFile(inputPath_, std::ios::binary);
-//   std::ofstream outputFile(outputPath_, std::ios::binary);
+  while (inputStream.read(buffer, BUFFER_SIZE) || inputStream.gcount() > 0) {
+    size_t readCount = inputStream.gcount();
+    std::string encodeBits;
+    // 编码
+    for (size_t i = 0; i < readCount; i++) {
+      encodeBits += huffmanCollector.codeTable[buffer[i]];
+    }
+    // 写入
+    for (auto bit : encodeBits) {
+      bitWriter.writeBit(bit == '0');
+      bitCount++;
+      if (bitCount == 8) {
+        compressByteCount++;
+      }
+    }
+  }
+  if (bitCount > 8) {
+    compressByteCount++;
+  }
+  return compressByteCount;
+}
 
-//   if (!inputFile.is_open()) {
-//     throw std::runtime_error("无法打开输入文件！");
-//   }
+int ClassicHuffmanTreeEncoder::serialize(std::ostream &os,
+                                         const HuffmanNode *root) {
+  // 1. 获取树结构、子节点列表、
+  std::vector<bool> structBits;
+  std::vector<uint8_t> leaves;
+  buildSerializationArrays(root, structBits, leaves);
 
-//   if (!outputFile.is_open()) {
-//     throw std::runtime_error("无法打开输出文件！");
-//   }
+  // 1.写入树结构序列化长度
+  uint32_t structBitsLen = uint32_t(structBits.size());
+  write4Byte(os, structBitsLen);
 
-//   // 用于存储文件数据的缓冲区
-//   char buffer[BUFFER_SIZE];
+  // 2.写入子节点列表序列化长度
+  uint32_t leafCount = uint32_t(leaves.size());
+  write4Byte(os, leafCount);
 
-//   // 获取频率
-//   while (inputFile.read(buffer, BUFFER_SIZE) || inputFile.gcount() > 0) {
-//     size_t bytesRead = inputFile.gcount();
-//     for (uint8_t b : buffer) {
-//       frequencies_[b]++;
-//     }
-//   }
-//   huffmanTree_.buildTree(frequencies_);
+  // 3. 写入树结构
+  std::vector<Byte> packed;
+  bits2BytesWithMSBF(structBits, packed);
+  if (!packed.empty()) {
+    os.write(reinterpret_cast<char *>(packed.data()), packed.size());
+  }
 
-//   // 清除EOF标志和其他错误标志
-//   inputFile.clear(); // 重要！必须先清除错误标志
+  // 4. 写入节点列表
+  if (!leaves.empty()) {
+    os.write(reinterpret_cast<char *>(leaves.data()), leaves.size());
+  }
+}
 
-//   // 将文件指针移回开头
-//   inputFile.seekg(0, std::ios::beg);
-//   BitWriter bitWriter(outputFile);
-//   while (inputFile.read(buffer, BUFFER_SIZE) || inputFile.gcount() > 0) {
-//     std::string t = huffmanTree_.encode(buffer, inputFile.gcount());
-//     bitWriter.writeBits(t);
-//   }
+ClassicHuffmanTreeEncoder::HuffmanNodePtr
+ClassicHuffmanTreeEncoder::buildTree(const FrequencyArray &frequencyArray) {
+  using FrequencyNode = std::pair<uint64_t, HuffmanNodePtr>;
 
-//   bitWriter.flush();
+  auto huffmanNodeCmp = [](const FrequencyNode &a,
+                           const FrequencyNode &b) -> bool {
+    return a.first > b.first;
+  };
 
-//   // 关闭文件
-//   inputFile.close();
-//   outputFile.close();
-// }
+  std::priority_queue<FrequencyNode, std::vector<FrequencyNode>,
+                      decltype(huffmanNodeCmp)>
+      pq;
 
-// void FileCompressor::decompress(std::string_view out) {
-//   // 打开输入文件和输出文件
-//   std::ifstream inputFile(inputPath_, std::ios::binary);
-//   std::ofstream outputFile(std::string(out), std::ios::binary);
+  for (int i = 0; i < 256; ++i) {
+    if (frequencyArray[i] > 0) {
+      pq.push({frequencyArray[i], std::make_unique<HuffmanNode>(i)});
+    }
+  }
 
-//   if (!inputFile.is_open()) {
-//     throw std::runtime_error("无法打开输入文件！");
-//   }
+  if (pq.size() == 0) {
+    return nullptr;
+  }
 
-//   if (!outputFile.is_open()) {
-//     throw std::runtime_error("无法打开输出文件！");
-//   }
+  // 单字符文件兜底
+  if (pq.size() == 1) {
+    uint8_t dummyChar = frequencyArray[0] > 0 ? 1 : 0;
+    pq.push({0, std::make_unique<HuffmanNode>(dummyChar)});
+  }
 
-//   // 用于存储文件数据的缓冲区
-//   char buffer[BUFFER_SIZE];
-//   int decodeIndex = 0;
+  while (pq.size() > 1) {
+    auto [freq1, left] = std::move(const_cast<FrequencyNode &>(pq.top()));
+    pq.pop();
 
-//   std::string result;
-//   // 获取频率
-//   while (inputFile.read(buffer, BUFFER_SIZE) || inputFile.gcount() > 0) {
-//     size_t bytesRead = inputFile.gcount();
-//     huffmanTree_.decode(buffer);
-//   }
+    auto [freq2, right] = std::move(const_cast<FrequencyNode &>(pq.top()));
+    pq.pop();
 
-//   // 关闭文件
-//   inputFile.close();
-//   outputFile.close();
-// }
-// } // namespace leza::compression::huffman
+    auto new_node =
+        std::make_unique<HuffmanNode>(std::move(left), std::move(right));
+    pq.push({freq1 + freq2, std::move(new_node)});
+  }
+
+  auto [_, root] = std::move(const_cast<FrequencyNode &>(pq.top()));
+  return std::move(root);
+}
+
+// 注意：目前使用前序遍历哈夫曼树
+ClassicHuffmanTreeEncoder::HuffmanCollector
+ClassicHuffmanTreeEncoder::collectTreeByPreorder(const HuffmanNode *root) {
+  HuffmanCollector huffmanCollector;
+  auto generate = [](this auto &&generate, const HuffmanNode *node,
+                     const std::string &code,
+                     HuffmanCollector &huffmanCollector) -> void {
+    if (!node) {
+      return;
+    }
+    huffmanCollector.onEnter(node, code);
+    if (node->left) {
+      generate(node->left.get(), code + "0", huffmanCollector);
+    }
+    if (node->right) {
+      generate(node->right.get(), code + "1", huffmanCollector);
+    }
+  };
+  generate(root, "", huffmanCollector);
+  return huffmanCollector;
+}
+
+// 注意：目前使用前序遍历哈夫曼树
+// 如果需要修改中序遍历和后序遍历，修改该函数在ClassicHuffmanTreeEncoder::buildCodeTable中的顺序即可。
+// 一次遍历获取：树结构、子节点列表、码表
+// 树结构、子节点列表：用于序列化哈夫曼树，码表：用于压缩
+// 0节点，1叶子
+void ClassicHuffmanTreeEncoder::HuffmanCollector::onEnter(
+    const HuffmanNode *node, const std::string &code) {
+  if (node->isLeaf()) {
+    structBits.push_back(true);
+    leaves.push_back(node->symbol);
+  } else {
+    structBits.push_back(false);
+  }
+}
+
+} // namespace leza::compression::huffman::classic
