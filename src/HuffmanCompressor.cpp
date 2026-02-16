@@ -286,12 +286,8 @@ ClassicHuffmanTreeEncoder::collectTreeByPreorder(const HuffmanNode *root) {
       return;
     }
     huffmanCollector.onEnter(node, code);
-    if (node->left) {
-      generate(node->left.get(), code + "0", huffmanCollector);
-    }
-    if (node->right) {
-      generate(node->right.get(), code + "1", huffmanCollector);
-    }
+    generate(node->left.get(), code + "0", huffmanCollector);
+    generate(node->right.get(), code + "1", huffmanCollector);
   };
   generate(root, "", huffmanCollector);
   return huffmanCollector;
