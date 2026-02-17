@@ -1,6 +1,10 @@
 ## 编码约定
 - 大端模式
 
+## 文件头
+![文件头结构](docs/images/huffman-header.png)
+
+
 ## 哈夫曼树序列化结构
 - 节点最多511个
 - 子节点最多256个
@@ -8,6 +12,9 @@
 ![哈夫曼树序列化结构](docs/images/huffman-serialization-example.png)
 
 前序遍历获取哈夫曼树结构，0节点，1叶子，1出现顺序和叶子节点列表一一对应。
+
+> Q: 为什么不需要记录哈夫曼树bit数组结尾有效数据位？<br/>
+> A: 因为叶子节点遍历完即完成
 
 编码伪代码：
 ```C++
@@ -38,3 +45,29 @@ void decode(const uint8_t *bits, int bitIdx, const string& code) {
 ```
 
 ![哈夫曼树序列化例子](docs/images/huffman-example.png)
+
+# 代码风格
+## 基于 clang-format LLVM
+```
+# 属性后换行
+BreakAfterAttributes: Always
+# 模板 template 后换行
+AlwaysBreakTemplateDeclarations: Yes
+```
+## 指定初始化器 (C++20)
+不知道怎么该 clang-format，还是不要用了，默认 LLVM 会把下面代码：
+```c++
+Header header{
+    .magicNumber = MAGIC_NUMBER,
+    .version = VERSION_NUMBER,
+    .isDirectory = false,
+    .extend = 0
+};
+```
+改成：
+```c++
+Header header{.magicNumber = MAGIC_NUMBER,
+            .version = VERSION_NUMBER,
+            .isDirectory = false,
+            .extend = 0};
+```

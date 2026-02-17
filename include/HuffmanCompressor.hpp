@@ -7,6 +7,7 @@
 #include <ostream>
 #include <string>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <vector>
 
 namespace leza::compression::huffman::classic {
@@ -28,6 +29,17 @@ struct HuffmanNode {
 
 class ClassicHuffmanTreeEncoder {
 public:
+  struct EncodeResult {
+    uint32_t compressSize;
+    uint32_t serializeTreeSize;
+    uint8_t compressPadding;
+    EncodeResult() = delete;
+    EncodeResult(uint32_t compressSize, uint32_t serializeTreeSize,
+                 uint8_t compressPadding)
+        : compressSize(compressSize), serializeTreeSize(serializeTreeSize),
+          compressPadding(compressPadding) {}
+  };
+
   static constexpr size_t BYTE_SIZE = 256;
   static constexpr size_t BUFFER_SIZE = 1024;
   using FrequencyArray = std::array<uint64_t, BYTE_SIZE>;
@@ -36,8 +48,8 @@ public:
 
   ClassicHuffmanTreeEncoder() = delete;
 
-  static int encode(std::istream &inputStream, std::ostream &outputStream,
-                    const FrequencyArray &frequencyArray);
+  static EncodeResult encode(std::istream &inputStream,
+                             std::ostream &outputStream);
 
 private:
   struct HuffmanCollector {
@@ -45,34 +57,17 @@ private:
     std::vector<uint8_t> leaves;
     CodeTable codeTable;
 
-    // 进入节点时的处理逻辑
     void onEnter(const HuffmanNode *node, const std::string &code);
   };
+
+  static FrequencyArray getFrequencyArray(std::istream &inputStream);
   [[nodiscard]]
-  static int serialize(std::ostream &os, const HuffmanNode *root);
+  static int serialize(std::ostream &os, const std::vector<bool> structBits,
+                       const std::vector<uint8_t> leaves);
   [[nodiscard]]
   static HuffmanNodePtr buildTree(const FrequencyArray &frequencyArray);
   [[nodiscard]]
   static HuffmanCollector collectTreeByPreorder(const HuffmanNode *root);
-  static FrequencyArray getFrequencyArray(std::istream &inputStream,
-                                          uint64_t &fileSize);
-  void buildSerializationArrays(const HuffmanNode *node,
-                                std::vector<bool> &structBits,
-                                std::vector<uint8_t> &leaves);
-  void bits2BytesWithMSBF(const std::vector<bool> &bits,
-                          std::vector<uint8_t> &out);
-  void serializeTree2Stream(const HuffmanNode *root, std::ostream &os);
-  void write4Byte(std::ostream &os, uint32_t v);
-};
-
-struct Header {
-  uint64_t originFileSize;
-  uint32_t huffmanTreeSize;
-  uint32_t compressSize;
-  uint32_t magicNumber;
-  uint8_t version;
-  uint8_t isDirectory;
-  uint16_t extend;
 };
 
 class FileCompressor : private utility::NonCopyable {
@@ -91,21 +86,29 @@ public:
   int compress(std::istream &inputStream, std::ostream &outputStream);
 
 private:
+  struct Header {
+    uint64_t originFileSize;
+    uint32_t huffmanTreeSize;
+    uint32_t compressSize;
+    uint32_t magicNumber;
+    uint8_t version;
+    uint8_t isDirectory;
+    uint8_t compressPadding;
+    uint8_t extend;
+  };
   static constexpr size_t BUFFER_SIZE = 1024 * 1024;
 
   std::string inputPath_;
   std::string outputPath_;
   char buffer_[BUFFER_SIZE];
 
-  [[nodiscard]]
-  static FrequencyArray getFrequencyArray(std::istream &inputStream,
-                                          uint64_t &fileSize);
-  void buildSerializationArrays(const HuffmanNode *node,
-                                std::vector<bool> &structBits,
-                                std::vector<Byte> &leaves);
-  void bits2BytesWithMSBF(const std::vector<bool> &bits,
-                          std::vector<Byte> &out);
-  void serializeTree2Stream(const HuffmanNode *root, std::ostream &os);
-  void write4Byte(std::ostream &os, uint32_t v);
+  static void wirteHeader(std::ostream &outputStream, Header header);
+
+  template <typename T>
+  static void writeInBigEnd(std::ostream &os, T value) {
+    for (int i = sizeof(T) - 1; i >= 0; --i) {
+      os.put(static_cast<char>((value >> (i * 8)) & 0xFF));
+    }
+  }
 };
 } // namespace leza::compression::huffman::classic
