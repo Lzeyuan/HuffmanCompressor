@@ -23,26 +23,15 @@ target_link_libraries(
 )
 
 add_executable(
-  HuffmanTest
-  HuffmanTest.cpp
-)
-target_link_libraries(
-  HuffmanTest
-  GTest::gtest_main
-  huffman-compressor-lib
-)
-
-add_executable(
   HuffmanCompressorTest
   HuffmanCompressorTest.cpp
 )
 target_link_libraries(
   HuffmanCompressorTest
+  HuffmanCompressorLib
   GTest::gtest_main
-  huffman-compressor-lib
 )
 
 include(GoogleTest)
 gtest_discover_tests(HelloTest)
 gtest_discover_tests(HuffmanCompressorTest)
-

@@ -10,8 +10,6 @@ public:
   explicit BitWriter(std::ostream &os) : out(os) {}
 
   void writeBit(bool bit);
-  void writeBits(uint64_t bits, uint8_t count);
-  void writeBits(std::string_view bits);
   int flush();
 
 private:
