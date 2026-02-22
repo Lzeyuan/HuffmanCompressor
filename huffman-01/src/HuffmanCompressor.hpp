@@ -5,8 +5,6 @@
 #include <cstdint>
 #include <memory>
 #include <span>
-#include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace leza::compression::huffman::classic {
@@ -16,7 +14,7 @@ struct HuffmanNode;
 
 constexpr size_t BYTE_SIZE = 256;
 using FrequencyArray = std::array<uint64_t, BYTE_SIZE>;
-using CodeTable = std::array<std::string, BYTE_SIZE>;
+using CodeTable = std::array<std::vector<uint8_t>, BYTE_SIZE>;
 using HuffmanNodePtr = std::unique_ptr<HuffmanNode>;
 
 struct HuffmanNode {
