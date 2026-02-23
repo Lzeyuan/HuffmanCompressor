@@ -3,8 +3,8 @@ include(FetchContent)
 FetchContent_Declare(
   googletest
   GIT_REPOSITORY https://github.com/google/googletest.git
-  GIT_TAG v1.17.0  # 使用具体的发布版本标签
-  GIT_SHALLOW TRUE  # 可选：只克隆最新提交，减少下载量
+  GIT_TAG v1.17.0
+  GIT_SHALLOW TRUE
 )
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -23,15 +23,15 @@ target_link_libraries(
 )
 
 add_executable(
-  HuffmanCompressorTest
-  HuffmanCompressorTest.cpp
+  BitWriterTest
+  BitWriterTest.cpp
 )
 target_link_libraries(
-  HuffmanCompressorTest
-  HuffmanCompressorLib
+  BitWriterTest
   GTest::gtest_main
+  HuffmanCompressorLib
 )
 
 include(GoogleTest)
 gtest_discover_tests(HelloTest)
-gtest_discover_tests(HuffmanCompressorTest)
+gtest_discover_tests(BitWriterTest)
