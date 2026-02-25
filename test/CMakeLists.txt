@@ -23,15 +23,15 @@ target_link_libraries(
 )
 
 add_executable(
-  BitWriterTest
-  BitWriterTest.cpp
+  BinaryIOTest
+  BinaryIOTest.cpp
 )
 target_link_libraries(
-  BitWriterTest
+  BinaryIOTest
   GTest::gtest_main
   HuffmanCompressorLib
 )
 
 include(GoogleTest)
 gtest_discover_tests(HelloTest)
-gtest_discover_tests(BitWriterTest)
+gtest_discover_tests(BinaryIOTest)

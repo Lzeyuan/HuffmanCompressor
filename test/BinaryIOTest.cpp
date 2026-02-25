@@ -18,7 +18,7 @@ protected:
   std::string getResult() { return ss_.str(); }
 
   std::stringstream ss_;
-  leza::compression::huffman::util::OstreamSink sink_{ss_};
+  leza::compression::huffman::util::OStreamByteWriter sink_{ss_};
   leza::compression::huffman::util::BitWriter bitwriter_{sink_};
 };
 
@@ -97,7 +97,7 @@ TEST_F(BitWriterTest, VerifyBitOrderLogic) {
   EXPECT_EQ(static_cast<unsigned char>(getResult()[0]), 0b1000'0000);
 }
 
-class IByteSinkTest : public ::testing::Test {
+class IByteWriterTest : public ::testing::Test {
 protected:
   void SetUp() override {
     ss_.str("");
@@ -108,10 +108,10 @@ protected:
   std::string getResult() { return ss_.str(); }
 
   std::stringstream ss_;
-  leza::compression::huffman::util::OstreamSink sink_{ss_};
+  leza::compression::huffman::util::OStreamByteWriter sink_{ss_};
 };
 
-TEST_F(IByteSinkTest, WriteUInt16LittleEndian) {
+TEST_F(IByteWriterTest, WriteUInt16LittleEndian) {
   using namespace leza::compression::huffman::util;
 
   constexpr uint16_t expect = 10086;
@@ -121,7 +121,7 @@ TEST_F(IByteSinkTest, WriteUInt16LittleEndian) {
   EXPECT_EQ(static_cast<uint8_t>(ss_.str()[1]), expect >> 8 & 0xff);
 }
 
-TEST_F(IByteSinkTest, WriteUInt32LittleEndian) {
+TEST_F(IByteWriterTest, WriteUInt32LittleEndian) {
   using namespace leza::compression::huffman::util;
 
   constexpr uint32_t expect = 10086;
@@ -133,7 +133,7 @@ TEST_F(IByteSinkTest, WriteUInt32LittleEndian) {
   EXPECT_EQ(static_cast<uint8_t>(ss_.str()[3]), expect >> 3 * 8 & 0xff);
 }
 
-TEST_F(IByteSinkTest, WriteUInt64LittleEndian) {
+TEST_F(IByteWriterTest, WriteUInt64LittleEndian) {
   using namespace leza::compression::huffman::util;
 
   constexpr uint64_t expect = 10086;
@@ -149,7 +149,7 @@ TEST_F(IByteSinkTest, WriteUInt64LittleEndian) {
   EXPECT_EQ(static_cast<uint8_t>(ss_.str()[7]), expect >> 7 * 8 & 0xff);
 }
 
-TEST_F(IByteSinkTest, WriteInt16LittleEndian) {
+TEST_F(IByteWriterTest, WriteInt16LittleEndian) {
   using namespace leza::compression::huffman::util;
 
   constexpr int16_t expect = 0X3F3F;
@@ -159,7 +159,7 @@ TEST_F(IByteSinkTest, WriteInt16LittleEndian) {
   EXPECT_EQ(static_cast<uint8_t>(ss_.str()[1]), expect >> 8 & 0xff);
 }
 
-TEST_F(IByteSinkTest, WriteInt32LittleEndian) {
+TEST_F(IByteWriterTest, WriteInt32LittleEndian) {
   using namespace leza::compression::huffman::util;
 
   constexpr int32_t expect = 0X3F3F3F3F;
@@ -171,7 +171,7 @@ TEST_F(IByteSinkTest, WriteInt32LittleEndian) {
   EXPECT_EQ(static_cast<uint8_t>(ss_.str()[3]), expect >> 3 * 8 & 0xff);
 }
 
-TEST_F(IByteSinkTest, WriteInt64LittleEndian) {
+TEST_F(IByteWriterTest, WriteInt64LittleEndian) {
   using namespace leza::compression::huffman::util;
 
   constexpr int64_t expect = 0X3F3F3F3F;
@@ -187,13 +187,13 @@ TEST_F(IByteSinkTest, WriteInt64LittleEndian) {
   EXPECT_EQ(static_cast<uint8_t>(ss_.str()[7]), expect >> 7 * 8 & 0xff);
 }
 
-TEST_F(IByteSinkTest, WriteFloat) {
+TEST_F(IByteWriterTest, WriteFloat) {
   using namespace leza::compression::huffman::util;
 
   constexpr float input = 0.26f;
   sink_.writeInLittleEndian(input);
 
-  using UintT = typename IByteSink::UintSelector<sizeof(input)>::type;
+  using UintT = typename IByteWriter::UintSelector<sizeof(input)>::type;
   UintT expect = std::bit_cast<UintT>(input);
   // 不是想省略代码，float之类的类型大小是未知的，看平台实现。
   // 一般float是四字节
@@ -222,13 +222,13 @@ TEST_F(IByteSinkTest, WriteFloat) {
   ASSERT_EQ(std::bit_cast<float>(restore), input);
 }
 
-TEST_F(IByteSinkTest, WriteDouble) {
+TEST_F(IByteWriterTest, WriteDouble) {
   using namespace leza::compression::huffman::util;
 
   constexpr double input = 0.10086;
   sink_.writeInLittleEndian(input);
 
-  using UintT = typename IByteSink::UintSelector<sizeof(input)>::type;
+  using UintT = typename IByteWriter::UintSelector<sizeof(input)>::type;
   UintT expect = std::bit_cast<UintT>(input);
 
   for (int i = 0; i < sizeof(input); i++) {

@@ -1,7 +1,9 @@
+#pragma once
 #ifndef WRITER_HPP_
 #define WRITER_HPP_
 
 #include <cstdint>
+#include <istream>
 #include <ostream>
 #include <span>
 #include <type_traits>
@@ -10,9 +12,9 @@
 // 也就说其实把 iostream 作为接口参数就行了，但是可能后期会优化性能，
 // 所以还是加一层 IByteSink。
 namespace leza::compression::huffman::util {
-class IByteSink {
+class IByteWriter {
 public:
-  virtual ~IByteSink() = default;
+  virtual ~IByteWriter() = default;
 
   virtual void writeByte(uint8_t byte) = 0;
 
@@ -44,9 +46,9 @@ public:
   }
 };
 
-class OstreamSink final : public IByteSink {
+class OStreamByteWriter final : public IByteWriter {
 public:
-  OstreamSink(std::ostream &os) : os_(os) {}
+  OStreamByteWriter(std::ostream &os) : os_(os) {}
 
   void writeByte(uint8_t byte) override { os_.put(static_cast<char>(byte)); }
 
@@ -58,9 +60,30 @@ private:
   std::ostream &os_;
 };
 
+class IByteReader {
+public:
+  virtual ~IByteReader() = default;
+
+  virtual int readByte() = 0;
+  virtual size_t read(std::span<char> buffer) = 0;
+};
+
+class IStreamReader : public IByteReader {
+public:
+  IStreamReader(std::istream &is) : is_(is) {}
+
+  int readByte() override { return is_.get(); }
+  size_t read(std::span<char> buffer) override {
+    return is_.read(buffer.data(), buffer.size()).gcount();
+  }
+
+private:
+  std::istream &is_;
+};
+
 class BitWriter final {
 public:
-  explicit BitWriter(IByteSink &byteSink) : out_(byteSink) {}
+  explicit BitWriter(IByteWriter &byteSink) : out_(byteSink) {}
 
   void writeBit(bool bit) {
     buffer_ <<= 1;
@@ -86,7 +109,7 @@ public:
   }
 
 private:
-  IByteSink &out_;
+  IByteWriter &out_;
 
   uint8_t buffer_ = 0;   // bit 缓冲
   uint8_t bitCount_ = 0; // 当前 buffer 中已有多少 bit（0~7）
